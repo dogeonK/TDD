@@ -1,9 +1,6 @@
 package com.example.membership.service;
 
-import com.example.membership.MembershipErrorResult;
-import com.example.membership.MembershipException;
-import com.example.membership.MembershipResponse;
-import com.example.membership.MembershipType;
+import com.example.membership.*;
 import com.example.membership.domain.Membership;
 import com.example.membership.repository.MembershipRepository;
 import org.junit.jupiter.api.Test;
@@ -12,6 +9,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -24,6 +26,7 @@ public class MembershipServiceTest {
     private final String userId = "userId";
     private final MembershipType membershipType = MembershipType.NAVER;
     private final Integer point = 10000;
+    private final Long membershipId = Long.valueOf(1);
 
     @InjectMocks
     private MembershipService target;
@@ -59,7 +62,7 @@ public class MembershipServiceTest {
         doReturn(membership()).when(membershipRepository).save(any(Membership.class));
 
         // when
-        final MembershipResponse result = target.addMembership(userId, membershipType, point);
+        final MembershipAddResponse result = target.addMembership(userId, membershipType, point);
 
         // then
         assertThat(result.getId()).isNotNull();
@@ -70,4 +73,57 @@ public class MembershipServiceTest {
         verify(membershipRepository, Mockito.times(1)).save(any(Membership.class));
     }
 
+    @Test
+    public void 멤버십목록조회() {
+        // given
+        doReturn(Arrays.asList(
+                Membership.builder().build(),
+                Membership.builder().build(),
+                Membership.builder().build()
+        )).when(membershipRepository).findAllByUserId(userId);
+
+        // when
+        final List<MembershipDetailResponse> result = target.getMembershipList(userId);
+
+        // then
+        assertThat(result.size()).isEqualTo(3);
+
+    }
+
+    @Test
+    public void 멤버십상세조회실패_존재하지않음() {
+        // given
+        doReturn(Optional.empty()).when(membershipRepository).findById(membershipId);
+
+        // when
+        final MembershipException result = assertThrows(MembershipException.class, () -> target.getMembership(membershipId, userId));
+
+        // then
+        assertThat(result.getErrorResult()).isEqualTo(MembershipErrorResult.MEMBERSHIP_NOT_FOUND);
+    }
+
+    @Test
+    public void 멤버십상세조회실패_본인이아님() {
+        // given
+        doReturn(Optional.empty()).when(membershipRepository).findById(membershipId);
+
+        // when
+        final MembershipException result = assertThrows(MembershipException.class, () -> target.getMembership(membershipId, "notowner"));
+
+        // then
+        assertThat(result.getErrorResult()).isEqualTo(MembershipErrorResult.MEMBERSHIP_NOT_FOUND);
+    }
+
+    @Test
+    public void 멤버십상세조회성공() {
+        // given
+        doReturn(Optional.of(membership())).when(membershipRepository).findById(membershipId);
+
+        // when
+        final MembershipDetailResponse result = target.getMembership(membershipId, userId);
+
+        // then
+        assertThat(result.getMembershipType()).isEqualTo(MembershipType.NAVER);
+        assertThat(result.getPoint()).isEqualTo(point);
+    }
 }
